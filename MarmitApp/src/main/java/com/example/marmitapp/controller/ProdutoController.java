@@ -33,4 +33,27 @@ public class ProdutoController {
         Produto salvo = repo.save(p);
         return ResponseEntity.created(URI.create("/produtos/" + salvo.getId())).body(salvo);
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Produto> atualizar(@PathVariable Long id, @Valid @RequestBody Produto p) {
+        return repo.findById(id)
+                .map(existente -> {
+                    existente.setNome(p.getNome());
+                    existente.setPreco(p.getPreco());
+                    existente.setEstoque(p.getEstoque());
+                    existente.setImagem(p.getImagem());
+                    repo.save(existente);
+                    return ResponseEntity.ok(existente);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletar(@PathVariable Long id) {
+        if (!repo.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        repo.deleteById(id);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -11,7 +11,7 @@ public class Produto {
     private Long id;
 
     @NotBlank
-    private String nome;
+    private String nome; // Funciona como o seu "Título"
 
     @Positive
     private BigDecimal preco;
@@ -19,11 +19,19 @@ public class Produto {
     @Min(0)
     private Integer estoque;
 
+    @Column(length = 500) // Aumenta o tamanho para caber links grandes
+    private String imagem;
+
     public Produto() {}
-    public Produto(String nome, BigDecimal preco, Integer estoque) {
-        this.nome = nome; this.preco = preco; this.estoque = estoque;
+
+    public Produto(String nome, BigDecimal preco, Integer estoque, String imagem) {
+        this.nome = nome;
+        this.preco = preco;
+        this.estoque = estoque;
+        this.imagem = imagem;
     }
 
+    // Getters e Setters existentes...
     public Long getId() { return id; }
     public String getNome() { return nome; }
     public void setNome(String nome) { this.nome = nome; }
@@ -31,4 +39,6 @@ public class Produto {
     public void setPreco(BigDecimal preco) { this.preco = preco; }
     public Integer getEstoque() { return estoque; }
     public void setEstoque(Integer estoque) { this.estoque = estoque; }
+    public String getImagem() { return imagem; }
+    public void setImagem(String imagem) { this.imagem = imagem; }
 }
