@@ -1,179 +1,258 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api";
 
 // Material UI
-    import {
-    Box, // usamos no map
-    Typography, Paper, Chip, Alert,
-    Card, CardContent, List, ListItem, ListItemText,
-    Stack, TextField, Button, Divider
-    } from "@mui/material";
-    import AddIcon from "@mui/icons-material/Add";
+import {
+    Box, Typography, Paper, Chip, IconButton,
+    Card, CardContent, CardMedia, CardActions,
+    Grid,
+    Stack, TextField, Button, 
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    Snackbar, Alert
+} from "@mui/material";
 
-    import Page from "../components/Page";
+// Ícones
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import RestaurantMenuIcon from "@mui/icons-material/RestaurantMenu";
 
-    export default function Marmitas() {
+import { useCart } from "../contexts/CartContext";
+import Page from "../components/Page";
+
+export default function Marmitas() {
+    // --- Estados e Hooks ---
+    const { adicionarAoCarrinho } = useCart();
     const [produtos, setProdutos] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [erro, setErro] = useState("");
 
-    // form
+    const [openForm, setOpenForm] = useState(false);
+    const [editandoId, setEditandoId] = useState(null);
     const [nome, setNome] = useState("");
     const [preco, setPreco] = useState("");
     const [estoque, setEstoque] = useState("");
+    const [imagem, setImagem] = useState(""); 
 
-    const temDados = useMemo(
-    () => Array.isArray(produtos) && produtos.length > 0,
-    [produtos]
-    );
+    const [openDelete, setOpenDelete] = useState(false);
+    const [idToDelete, setIdToDelete] = useState(null);
 
+    const [snack, setSnack] = useState({ open: false, msg: "", severity: "success" });
+
+    // --- Carregar Dados ---
     const carregar = async () => {
-    setLoading(true);
-    setErro("");
-    try {
-        const { data } = await api.get("/produtos");
-        setProdutos(data);
-    } catch (e) {
-        console.error(e);
-        setErro(
-        "Não consegui carregar /produtos. Verifique se o backend está rodando em http://localhost:8080."
-        );
-    } finally {
-        setLoading(false);
-    }
+        setLoading(true);
+        try {
+            const { data } = await api.get("/produtos");
+            setProdutos(data);
+        } catch (e) {
+            console.error(e);
+            showSnack("Erro ao carregar produtos.", "error");
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => { carregar(); }, []);
 
-    const handleCriar = async (e) => {
-    e.preventDefault();
-    setErro("");
+    // --- Helpers ---
+    const showSnack = (msg, severity = "success") => setSnack({ open: true, msg, severity });
+    const handleCloseSnack = () => setSnack({ ...snack, open: false });
 
-    const payload = {
-        nome: nome?.trim(),
-        ...(preco ? { preco: Number(preco) } : {}),
-        ...(estoque ? { estoque: Number(estoque) } : {}),
+    // --- Handlers do Formulário ---
+    const handleAbrirNovo = () => {
+        setEditandoId(null);
+        setNome(""); setPreco(""); setEstoque(""); setImagem("");
+        setOpenForm(true);
     };
 
-    if (!payload.nome) {
-        setErro("Informe ao menos o nome da marmita.");
-        return;
-    }
+    const handleAbrirEditar = (p) => {
+        setEditandoId(p.id);
+        setNome(p.nome);
+        setPreco(p.preco);
+        setEstoque(p.estoque);
+        setImagem(p.imagem || "");
+        setOpenForm(true);
+    };
 
-    try {
-        await api.post("/produtos", payload);
-        setNome(""); setPreco(""); setEstoque("");
-        await carregar();
-    } catch (e) {
-        console.error(e);
-        setErro(
-        "Ainda não consegui salvar. Se o backend não tem POST /produtos, a gente implementa em seguida."
-        );
-    }
+    const handleSalvar = async () => {
+        const payload = { nome, preco: Number(preco), estoque: Number(estoque), imagem };
+        try {
+            if (editandoId) {
+                await api.put(`/produtos/${editandoId}`, payload);
+                showSnack("Produto atualizado com sucesso!");
+            } else {
+                await api.post("/produtos", payload);
+                showSnack("Produto adicionado com sucesso!");
+            }
+            setOpenForm(false);
+            carregar();
+        } catch (e) {
+            showSnack("Erro ao salvar. Verifique os dados.", "error");
+        }
+    };
+
+    const confirmarExclusao = (id) => {
+        setIdToDelete(id);
+        setOpenDelete(true);
+    };
+
+    const executarExclusao = async () => {
+        try {
+            await api.delete(`/produtos/${idToDelete}`);
+            showSnack("Produto excluído!");
+            carregar();
+        } catch (e) {
+            showSnack("Erro ao excluir.", "error");
+        } finally {
+            setOpenDelete(false);
+        }
     };
 
     return (
-    <Page maxWidth={false} containerProps={{ disableGutters: true }}>
-        {/* card centralizado e largo */}
-        <Paper sx={{ p: 3, borderRadius: 3, maxWidth: 1200, mx: "auto" }}>
-
-        <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Marmitas
-            </Typography>
-            <Chip label="Lista + Cadastro" size="small" />
-        </Stack>
-
-        {erro && <Alert severity="error" sx={{ mb: 2 }}>{erro}</Alert>}
-
-        <Card sx={{ mb: 3, borderRadius: 3 }} variant="outlined">
-            <CardContent>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                Lista de marmitas
-            </Typography>
-
-            {loading ? (
-                <Typography>Carregando…</Typography>
-            ) : temDados ? (
-                <List disablePadding>
-                {produtos.map((p, idx) => {
-                    const nome = typeof p === "string" ? p : p?.nome ?? "(sem nome)";
-                    const preco =
-                    typeof p === "object" && p?.preco != null
-                        ? `R$ ${Number(p.preco).toFixed(2)}`
-                        : null;
-                    const estoque =
-                    typeof p === "object" && p?.estoque != null
-                        ? ` • estoque: ${p.estoque}`
-                        : "";
-
-                    return (
-                    <Box key={p?.id ?? `${nome}-${idx}`}>
-                        <ListItem disableGutters>
-                        <ListItemText
-                            primary={nome}
-                            secondary={[preco, estoque].filter(Boolean).join("")}
-                        />
-                        </ListItem>
-                        {idx < produtos.length - 1 && <Divider />}
-                    </Box>
-                    );
-                })}
-                </List>
-            ) : (
-                <Typography>Nenhum item encontrado.</Typography>
-            )}
-            </CardContent>
-        </Card>
-
-        <Card sx={{ borderRadius: 3 }} variant="outlined">
-            <CardContent component="form" onSubmit={handleCriar}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
-                Cadastrar nova marmita
-            </Typography>
-
-            <Stack spacing={2}>
-                <TextField
-                label="Nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                required
-                />
-
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField
-                    label="Preço (opcional)"
-                    type="number"
-                    inputProps={{ step: "0.01" }}
-                    value={preco}
-                    onChange={(e) => setPreco(e.target.value)}
-                    sx={{ flex: 1 }}
-                />
-                <TextField
-                    label="Estoque (opcional)"
-                    type="number"
-                    value={estoque}
-                    onChange={(e) => setEstoque(e.target.value)}
-                    sx={{ flex: 1 }}
-                />
+        <Page maxWidth="lg">
+            
+            {/* Cabeçalho */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={4}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="h4" fontWeight={800} color="primary.main">Cardápio</Typography>
+                    <Chip label={`${produtos.length} opções`} />
                 </Stack>
-
-                <Stack direction="row" spacing={2}>
-                <Button type="submit" variant="contained" startIcon={<AddIcon />}>
-                    Salvar
+                <Button variant="contained" startIcon={<AddIcon />} onClick={handleAbrirNovo} size="large">
+                    Nova Marmita
                 </Button>
-                <Button
-                    variant="text"
-                    onClick={() => { setNome(""); setPreco(""); setEstoque(""); }}
-                >
-                    Limpar
-                </Button>
-                </Stack>
             </Stack>
-            </CardContent>
-        </Card>
 
-        </Paper>
-    </Page>
+            {/* --- GRID DE CARDS --- */}
+            {loading ? (
+                <Typography>Carregando...</Typography>
+            ) : (
+                <Grid container spacing={3} alignItems="stretch"> 
+                    {produtos.map((p) => (
+                        <Grid item xs={12} sm={6} md={4} key={p.id} sx={{ display: 'flex' }}>
+                            <Card 
+                                elevation={3} 
+                                sx={{ 
+                                    width: '100%',
+                                    display: 'flex', 
+                                    flexDirection: 'column',
+                                    justifyContent: 'space-between',
+                                    borderRadius: 3,
+                                    transition: 'transform 0.2s',
+                                    '&:hover': { transform: 'scale(1.02)' }
+                                }}
+                            >
+                                {/* Imagem do Card - AJUSTADA */}
+                                {p.imagem ? (
+                                    <CardMedia
+                                        component="img"
+                                        height="200"
+                                        image={`/assets/images/${p.imagem}`} 
+                                        alt={p.nome}
+                                        sx={{ objectFit: "cover" }} // <--- O SEGREDO ESTÁ AQUI
+                                    />
+                                ) : (
+                                    <Box 
+                                        height="200px" 
+                                        bgcolor="grey.200" 
+                                        display="flex" 
+                                        alignItems="center" 
+                                        justifyContent="center"
+                                    >
+                                        <RestaurantMenuIcon sx={{ fontSize: 60, color: 'grey.400' }} />
+                                    </Box>
+                                )}
+
+                                <CardContent sx={{ flexGrow: 1 }}>
+                                    <Typography variant="h6" fontWeight={700} gutterBottom>
+                                        {p.nome}
+                                    </Typography>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                        <Typography variant="h5" color="success.main" fontWeight={800}>
+                                            R$ {Number(p.preco).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Estoque: {p.estoque}
+                                        </Typography>
+                                    </Stack>
+                                </CardContent>
+
+                                {/* Botões de Ação */}
+                                <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
+                                    <Button 
+                                        variant="contained" 
+                                        color="success"
+                                        startIcon={<ShoppingCartIcon />}
+                                        onClick={() => {
+                                            adicionarAoCarrinho(p);
+                                            showSnack("Adicionado ao carrinho!");
+                                        }}
+                                        fullWidth
+                                        sx={{ mr: 1 }}
+                                    >
+                                        Comprar
+                                    </Button>
+
+                                    <Stack direction="row">
+                                        <IconButton size="small" onClick={() => handleAbrirEditar(p)} color="primary">
+                                            <EditIcon />
+                                        </IconButton>
+                                        <IconButton size="small" onClick={() => confirmarExclusao(p.id)} color="error">
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </Stack>
+                                </CardActions>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
+
+            {produtos.length === 0 && !loading && (
+                <Paper sx={{ p: 4, textAlign: 'center' }}>
+                    <Typography color="text.secondary">Nenhuma marmita cadastrada.</Typography>
+                </Paper>
+            )}
+
+            {/* --- MODAIS --- */}
+            <Dialog open={openForm} onClose={() => setOpenForm(false)} fullWidth maxWidth="sm">
+                <DialogTitle>{editandoId ? "Editar Marmita" : "Nova Marmita"}</DialogTitle>
+                <DialogContent dividers>
+                    <Stack spacing={2} sx={{ mt: 1 }}>
+                        <TextField label="Nome do Produto" value={nome} onChange={e => setNome(e.target.value)} fullWidth autoFocus />
+                        <Stack direction="row" spacing={2}>
+                            <TextField label="Preço" type="number" value={preco} onChange={e => setPreco(e.target.value)} fullWidth />
+                            <TextField label="Estoque" type="number" value={estoque} onChange={e => setEstoque(e.target.value)} fullWidth />
+                        </Stack>
+                        <TextField 
+                            label="Nome do Arquivo da Imagem" 
+                            value={imagem} onChange={e => setImagem(e.target.value)} 
+                            fullWidth 
+                            placeholder="Ex: marmita.jpeg" 
+                            helperText="Certifique-se que o arquivo está na pasta public/assets/imagens"
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpenForm(false)}>Cancelar</Button>
+                    <Button onClick={handleSalvar} variant="contained">Salvar</Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={openDelete} onClose={() => setOpenDelete(false)}>
+                <DialogTitle>Tem certeza?</DialogTitle>
+                <DialogContent>
+                    <Typography>Esta ação apagará o produto permanentemente.</Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpenDelete(false)}>Cancelar</Button>
+                    <Button onClick={executarExclusao} color="error" variant="contained" autoFocus>Apagar</Button>
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar open={snack.open} autoHideDuration={4000} onClose={handleCloseSnack} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+                <Alert onClose={handleCloseSnack} severity={snack.severity} variant="filled" sx={{ width: '100%' }}>{snack.msg}</Alert>
+            </Snackbar>
+        </Page>
     );
 }

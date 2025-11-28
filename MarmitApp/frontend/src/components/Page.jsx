@@ -1,18 +1,22 @@
-// src/components/Page.jsx
 import { Box, Container } from "@mui/material";
+import Footer from "./Footer"; // Importe o Footer
 
 export default function Page({ children, maxWidth = "lg", containerProps = {} }) {
     return (
         <Box
-        component="main"
-        sx={{
-            minHeight: "calc(100vh - 64px)", // altura total menos a AppBar
-            bgcolor: "grey.100",
-        }}
+            sx={{
+                display: "flex",
+                flexDirection: "column",
+                minHeight: "calc(100vh - 64px)", 
+                bgcolor: "grey.100",
+            }}
         >
-        <Container maxWidth={maxWidth} sx={{ py: 4 }} {...containerProps}>
-            {children}
-        </Container>
+            <Box component="main" sx={{ flexGrow: 1, py: 4 }}>
+                <Container maxWidth={maxWidth} {...containerProps}>
+                    {children}
+                </Container>
+            </Box>
+            <Footer />
         </Box>
     );
 }

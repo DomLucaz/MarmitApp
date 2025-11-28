@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { AppBar, Toolbar, Button, Box, Typography } from "@mui/material";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Badge } from "@mui/material";
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import { useCart } from "../contexts/CartContext";
 
 export default function Navbar() {
     const [isLogged, setIsLogged] = useState(!!localStorage.getItem("user"));
     const navigate = useNavigate();
+    const { itens } = useCart(); // Pegue os itens para contar
 
     useEffect(() => {
     // atualiza quando voltar da página de login/cadastro
@@ -30,6 +34,12 @@ export default function Navbar() {
         ) : (
             <Button color="inherit" component={RouterLink} to="/login">Login</Button>
         )}
+        {/* Botão do Carrinho */}
+        <Button color="inherit" component={RouterLink} to="/carrinho" sx={{ mr: 2 }}>
+            <Badge badgeContent={itens.length} color="secondary">
+                <ShoppingCartIcon />
+            </Badge>
+        </Button>
         </Toolbar>
     </AppBar>
     );
